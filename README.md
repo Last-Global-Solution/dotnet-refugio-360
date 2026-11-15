@@ -4,23 +4,12 @@
 
 API REST de demonstração com relatos comunitários, triagem por moderador, locais de apoio e alertas publicados após revisão. O escopo usa dados fictícios e não substitui orientação oficial de emergência.
 
-## Requisitos da disciplina .NET cobertos
-
-- ASP.NET Core Minimal API com endpoints REST de criação, consulta, atualização e exclusão, validações e respostas HTTP.
-- OpenAPI/Swagger em `/swagger`.
-- Idempotência persistida por usuário e `Idempotency-Key` em ocorrências.
-- Rate limiting de janela fixa; ao ultrapassar o limite a API responde HTTP `429`.
-- JWT com validação de emissor, audiência, assinatura e validade.
-- Perfis `Morador` e `Moderador`: relato próprio, triagem, confirmação da disponibilidade de locais e publicação de alertas com acesso controlado.
-- Health Checks em `/health/live` e `/health/ready`; este último verifica o banco SQLite. O projeto não depende de serviço Java.
-- Testes xUnit unitários de validação/transições de status e testes de integração de CRUD, triagem, autenticação, Swagger, Health Checks, rate limiting e idempotência.
-
 ## Estrutura
 
 ```text
 Refugio360/
   Refugio360.sln
-  Refugio360.Api/       único projeto .NET 10
+  Refugio360.Api/       projeto .NET 10
     Program.cs
     Application/        validações e regras da triagem
     Domain/             modelos e persistência do domínio
@@ -164,15 +153,6 @@ O `PUT` recebe todos os campos editáveis do recurso e retorna HTTP `200` com o 
 7. Crie ou escolha um local de apoio em `GET /api/v1/locais-seguros`. Em `PATCH /api/v1/locais-seguros/{id}/disponibilidade`, envie `{"disponibilidade":"Disponível nesta simulação"}`. A resposta mostra `disponibilidadeVerificadaEmUtc` preenchido com a hora UTC da confirmação.
 8. Consulte `/health/live` e `/health/ready`. Os testes podem ser executados com `dotnet test Refugio360.sln` a partir da pasta que contém a solução.
 
-## Checklist para a entrega FIAP
-
-- Abrir e executar a solução com o SDK .NET 10 em uma máquina com o runtime instalado.
-- Executar `dotnet test Refugio360.sln` e guardar a evidência do resultado.
-- Confirmar que o Swagger documenta contratos, parâmetros, códigos HTTP e mostra quais operações exigem JWT.
-- Na apresentação, demonstrar relato `Recebida` → `EmAnalise` → `Confirmada`, bloqueio de alteração após triagem, rascunho/publicação de alerta, data de confirmação de local, login, token inválido, perfil Morador sem permissão de moderador, idempotência, HTTP `429` e `/health/ready`.
-- Antes do envio no Portal do Aluno, criar o `.zip` exigido com o link do GitHub e o `.txt` de identificação do grupo já preenchido. Esse arquivo depende dos dados reais dos integrantes.
-- Entregar no Portal dentro do prazo indicado pela disciplina.
-
 ## Executar testes
 
 Pare a API se ela estiver rodando. Abra outro PowerShell na raiz `Refugio360` (a pasta que contém `Refugio360.sln`, com API e testes no mesmo `.csproj`) e execute:
@@ -196,5 +176,3 @@ O comando compila o único projeto e executa os testes unitários e de integraç
 | `ConnectionStrings:Refugio` | Não | `Data Source=refugio360.db` |
 | `RateLimit:PermitLimit` | Não | 60 requisições por janela |
 | `RateLimit:WindowMinutes` | Não | 1 minuto |
-
-Não coloque segredos em `appsettings.json`, no GitHub ou em capturas de tela.
