@@ -161,7 +161,9 @@ Pare a API se ela estiver rodando. Abra outro PowerShell na raiz `Refugio360` (a
 dotnet test Refugio360.sln
 ```
 
-O comando compila o único projeto e executa os testes unitários e de integração. Eles cobrem regras de transição de status, atualização de um banco SQLite antigo, CRUD, permissões e fluxo de revisão/publicação. Os testes de integração usam SQLite em memória, credenciais aleatórias e uma chave JWT própria; não exigem User Secrets nem alteram o banco local da aplicação.
+O comando compila o único projeto e executa os testes unitários e de integração. Eles cobrem regras de transição de status, atualização de um banco SQLite antigo, CRUD, permissões e fluxo de revisão/publicação. Os testes de integração usam SQLite em memória, credenciais aleatórias e uma chave JWT própria; não alteram o banco local da aplicação.
+
+Em um clone novo, **não é preciso configurar User Secrets para executar `dotnet test`**. As fábricas dos testes de integração fornecem a chave JWT antes da inicialização da API, independentemente dos segredos da sua máquina. Para executar a API com `dotnet run` e emitir tokens no Swagger, siga a configuração de usuário local descrita acima.
 
 ## Configuração
 
