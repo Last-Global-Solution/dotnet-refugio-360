@@ -17,12 +17,10 @@ using Refugio360.Api;
 var builder = WebApplication.CreateBuilder(args);
 
 var jwtSecret = builder.Configuration["Jwt:Secret"] ?? Environment.GetEnvironmentVariable("REFUGIO_JWT_SECRET");
-if (string.IsNullOrWhiteSpace(jwtSecret) &&
-    (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing")))
+if (string.IsNullOrWhiteSpace(jwtSecret) && builder.Environment.IsDevelopment())
 {
     jwtSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-    if (builder.Environment.IsDevelopment())
-        Console.WriteLine("JWT development key generated for this run. Configure User Secrets for stable tokens.");
+    Console.WriteLine("JWT development key generated for this run. Configure User Secrets for stable tokens.");
 }
 if (string.IsNullOrWhiteSpace(jwtSecret) || Encoding.UTF8.GetByteCount(jwtSecret) < 32)
     throw new InvalidOperationException("Configure Jwt:Secret (at least 32 UTF-8 bytes) using user secrets or REFUGIO_JWT_SECRET.");

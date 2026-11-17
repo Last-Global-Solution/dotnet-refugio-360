@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Refugio360.Api;
 using Xunit;
 
@@ -115,6 +116,15 @@ public sealed class RefugioApiFactory : WebApplicationFactory<global::Program>
         _anchor.Open();
     }
 
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        builder.ConfigureHostConfiguration(configuration => configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Jwt:Secret"] = JwtSecret
+        }));
+        return base.CreateHost(builder);
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -160,6 +170,15 @@ public sealed class RateLimitedApiFactory : WebApplicationFactory<global::Progra
     {
         _anchor = new SqliteConnection(_connectionString);
         _anchor.Open();
+    }
+
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        builder.ConfigureHostConfiguration(configuration => configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Jwt:Secret"] = JwtSecret
+        }));
+        return base.CreateHost(builder);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
