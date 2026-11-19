@@ -62,7 +62,7 @@ dotnet user-secrets set "DemoUser:Role" "Morador"
 
 Substitua os dois valores de exemplo por valores locais antes de usar. O login compara o usuário e a senha recebidos com os valores salvos nos User Secrets, caractere por caractere. Se você executou o comando acima sem substituir `SUBSTITUA-POR-UMA-SENHA-LOCAL`, essa frase inteira virou sua senha de demonstração. Para escolher outra, execute novamente `dotnet user-secrets set "DemoUser:Password" "SUA-SENHA-ESCOLHIDA"` na mesma pasta do `.csproj`, pare a API e inicie-a com `dotnet run`. Se User Secrets já tiver sido inicializado, pule o comando `dotnet user-secrets init`. Não publique os valores no GitHub.
 
-Cada cópia extraída do projeto tem seu próprio `UserSecretsId`. Se você configurou segredos em uma pasta anterior, repita estes comandos nesta cópia. Para apenas iniciar e abrir o Swagger, a API também cria uma chave JWT temporária em Development; para emitir tokens, configure o usuário e a senha acima.
+Cada cópia extraída do projeto tem seu próprio `UserSecretsId`. Se você configurou segredos em uma pasta anterior, repita estes comandos nesta cópia. A API exige um segredo JWT externo também em Development; ela não cria uma chave temporária a cada inicialização. Para emitir tokens, configure também o usuário e a senha acima.
 
 ### 3. Inicie a API
 
@@ -76,9 +76,9 @@ Quando o terminal indicar que a aplicação está ouvindo, abra `http://localhos
 
 Para testar endpoints de moderação, configure `DemoUser:Role` como `Moderador` usando `dotnet user-secrets set "DemoUser:Role" "Moderador"` e reinicie a API. A autenticação de demonstração usa um usuário configurado; antes de produção, substitua-a por um provedor de identidade adequado.
 
-O SQLite cria `refugio360.db` no diretório de execução (normalmente `Refugio360.Api`). Em Development, a primeira inicialização inclui dois locais de apoio fictícios, um alerta **já publicado somente para demonstração** e, se `DemoUser:Username` estiver configurado, uma ocorrência fictícia desse usuário. Reiniciar a API não duplica esses registros. Os locais fictícios começam com `disponibilidadeVerificadaEmUtc = null`: nenhuma disponibilidade real foi confirmada.
+O SQLite cria `refugio360.db` no diretório de execução (normalmente `Refugio360.Api`). O seed fica desligado por padrão em **todos** os ambientes. Para carregar os dados fictícios localmente, configure `DemoData__Enabled=true` antes de iniciar a API. Ele inclui dois locais de apoio fictícios, um alerta **já publicado somente para demonstração** e, se `DemoUser:Username` estiver configurado, uma ocorrência fictícia desse usuário. Reiniciar a API não duplica esses registros. Os locais fictícios começam com `disponibilidadeVerificadaEmUtc = null`: nenhuma disponibilidade real foi confirmada.
 
-Ao iniciar uma cópia nova do código com um `refugio360.db` de versão anterior, a API acrescenta a coluna de verificação de disponibilidade sem apagar os dados. Alertas antigos com status `Revisado` passam a `Publicado` para manter a visibilidade que já tinham. Isso é uma atualização pontual de esquema para SQLite, não um sistema geral de migrations. Os testes usam SQLite em memória e não alteram seu arquivo local. A carga fictícia não ocorre em Testing ou Production.
+Ao iniciar uma cópia nova do código com um `refugio360.db` de versão anterior, a API acrescenta a coluna de verificação de disponibilidade sem apagar os dados. Alertas antigos com status `Revisado` passam a `Publicado` para manter a visibilidade que já tinham. Isso é uma atualização pontual de esquema para SQLite, não um sistema geral de migrations. Os testes usam SQLite em memória e não alteram seu arquivo local. Em Testing ou Production, a carga fictícia só ocorre quando `DemoData__Enabled=true` for definido explicitamente.
 
 Se você extrair o ZIP em outra pasta e quiser manter seus registros, pare a API e copie o arquivo `refugio360.db` antigo para a nova pasta `Refugio360.Api` antes de executar `dotnet run`. Se não copiar, a API cria um banco novo com os dados fictícios de demonstração.
 
@@ -161,20 +161,54 @@ Pare a API se ela estiver rodando. Abra outro PowerShell na raiz `Refugio360` (a
 dotnet test Refugio360.sln
 ```
 
-O comando compila o único projeto e executa os testes unitários e de integração. Eles cobrem regras de transição de status, atualização de um banco SQLite antigo, CRUD, permissões e fluxo de revisão/publicação. Os testes de integração usam SQLite em memória, credenciais aleatórias e uma chave JWT própria; não alteram o banco local da aplicação.
+O comando compila o único projeto e executa os testes unitários e de integração. Eles cobrem regras de transição de status, atualização de um banco SQLite antigo, CRUD, permissões, JWT e seed opt-in em Production. Os testes de integração usam SQLite em memória, credenciais aleatórias e uma chave JWT própria; não alteram o banco local da aplicação.
 
-Em um clone novo, **não é preciso configurar User Secrets para executar `dotnet test`**. As fábricas dos testes de integração fornecem a chave JWT antes da inicialização da API, independentemente dos segredos da sua máquina. Para executar a API com `dotnet run` e emitir tokens no Swagger, siga a configuração de usuário local descrita acima.
+Em um clone novo, **não é preciso configurar User Secrets para executar `dotnet test`**. As fábricas dos testes fornecem a chave JWT antes de a API atender requisições, independentemente dos segredos da sua máquina; a aplicação valida essa chave com as mesmas regras do serviço real. Para executar a API com `dotnet run` e emitir tokens no Swagger, siga a configuração de usuário local descrita acima.
 
 ## Configuração
 
 | Chave | Obrigatória | Padrão/uso |
 |---|---:|---|
 | `Jwt:Secret` / `REFUGIO_JWT_SECRET` | Sim | Segredo com pelo menos 32 bytes |
+| `Jwt__Secret` | Sim no Render se não usar `REFUGIO_JWT_SECRET` | Equivalente a `Jwt:Secret` por configuração padrão do ASP.NET Core |
 | `Jwt:Issuer` | Não | `Refugio360` |
 | `Jwt:Audience` | Não | `Refugio360.Mobile` |
 | `DemoUser:Username` / `REFUGIO_DEMO_USER` | Sim para emitir token | Usuário de demonstração |
 | `DemoUser:Password` / `REFUGIO_DEMO_PASSWORD` | Sim para emitir token | Senha de demonstração |
 | `DemoUser:Role` / `REFUGIO_DEMO_ROLE` | Não | `Morador`; use `Moderador` para demo moderada |
 | `ConnectionStrings:Refugio` | Não | `Data Source=refugio360.db` |
+| `DemoData__Enabled` | Não | `false`; `true` ativa o seed acadêmico também em Production |
 | `RateLimit:PermitLimit` | Não | 60 requisições por janela |
 | `RateLimit:WindowMinutes` | Não | 1 minuto |
+
+## Docker e Render — serviço de demonstração
+
+O `Dockerfile` na raiz usa `mcr.microsoft.com/dotnet/sdk:10.0` para `restore/publish` e `mcr.microsoft.com/dotnet/aspnet:10.0` para execução. `COPY` parte da raiz do repositório, onde está `Refugio360.sln`, e referencia `Refugio360.Api/Refugio360.Api.csproj`. O `.dockerignore` exclui `.idea`, `.git`, `bin/obj`, bancos `.db` e variantes, arquivos `.env`, secrets e chaves. O executável escuta em `0.0.0.0:${PORT:-10000}`; `launchSettings.json` (porta 5000) só se aplica ao `dotnet run` local. A inicialização mantém `EnsureCreatedAsync()` e a atualização pontual de schema existente antes de executar o seed opt-in.
+
+### Validar localmente sem usar o banco existente
+
+Defina um segredo privado de teste com **pelo menos 32 bytes UTF-8** e não inclua seu valor em comandos versionados. O exemplo abaixo recebe `REFUGIO_JWT_SECRET` do ambiente do shell e usa um SQLite descartável **dentro do contêiner**, removido por `--rm` ao encerrá-lo:
+
+```bash
+export REFUGIO_JWT_SECRET="$(openssl rand -hex 32)"
+dotnet restore Refugio360.sln
+dotnet build Refugio360.sln --no-restore
+dotnet test Refugio360.sln --no-restore
+docker build -t refugio360-dotnet:demo .
+docker run --rm -p 10000:10000 -e REFUGIO_JWT_SECRET \
+  -e PORT=10000 -e ASPNETCORE_ENVIRONMENT=Production -e DemoData__Enabled=true \
+  -e 'ConnectionStrings__Refugio=Data Source=/tmp/refugio360-demo.db' \
+  refugio360-dotnet:demo
+```
+
+Com o contêiner no ar, verifique `http://localhost:10000/health/live`, `http://localhost:10000/health/ready`, `http://localhost:10000/api/v1/alertas` e `http://localhost:10000/api/v1/alertas/{id}` (ID da listagem). A lista deve conter um alerta `DEMO -`, publicado, ativo, não expirado, com fonte de simulação. O endpoint público não exige JWT.
+
+### Criar o Web Service no Render
+
+1. Selecione este repositório Git; crie **um** Web Service com runtime **Docker**. Use **Root Directory vazio (raiz do repositório)**, **Dockerfile Path `Dockerfile`** e contexto de build na raiz. Mantenha a branch desejada; não use `Refugio360.Api` como Root Directory com este Dockerfile.
+2. Configure Environment: `ASPNETCORE_ENVIRONMENT=Production`, `DemoData__Enabled=true` e `REFUGIO_JWT_SECRET` com uma chave aleatória estável de no mínimo 32 bytes (por exemplo, gere localmente com `openssl rand -hex 32` e armazene **somente** no painel Render). Como alternativa, configure `Jwt__Secret`, **não ambos com valores diferentes**. Não configure `Jwt:Secret` com valor fixo no repositório.
+3. `PORT` é fornecida pelo Render; caso precise definir manualmente, use `10000`. `ConnectionStrings__Refugio` é opcional; por padrão a imagem cria `/app/refugio360.db`. Configure `REFUGIO_DEMO_USER` e `REFUGIO_DEMO_PASSWORD` **somente** se precisar emitir tokens pelo `/api/v1/auth/token`; `REFUGIO_DEMO_ROLE` pode ser `Morador` (padrão) ou `Moderador`. Não há credencial administrativa padrão. `Jwt__Issuer` e `Jwt__Audience` são opcionais; padrões: `Refugio360` e `Refugio360.Mobile`.
+4. Configure o **Health Check Path `/health/ready`**, que confere o SQLite. `/health/live` confirma apenas que a aplicação responde. Nos logs de inicialização, confira binding em `0.0.0.0` na porta fornecida, criação/acesso ao banco e ausência de erros de JWT. O seed não precisa do ambiente `Development`.
+5. Depois do deploy, use a URL HTTPS **atribuída pelo Render** (não presuma um hostname). Faça `GET /health/live`, `/health/ready`, `/api/v1/alertas`; consulte também `GET /api/v1/alertas/{id}` com o ID obtido da listagem. A lista deve conter o alerta acadêmico DEMO sem token. Configure no Mobile `EXPO_PUBLIC_DOTNET_API_URL` com a **base HTTPS real**, sem acrescentar `/api/v1`.
+
+No plano gratuito o filesystem do Render é **efêmero**: o SQLite pode perder alertas reais, ocorrências e alterações durante reinício/redeploy. O seed repõe apenas dados fictícios ausentes e preserva registros encontrados pelo ID estável; não restaura dados reais. Mesmo com `DemoData__Enabled=true`, nenhum alerta fora do seed é publicado automaticamente: as rotas de moderação continuam exigindo revisão. O seed também só cria a ocorrência fictícia se `DemoUser:Username`/`REFUGIO_DEMO_USER` estiver configurado.

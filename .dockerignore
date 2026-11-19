@@ -1,0 +1,17 @@
+.git/
+.idea/
+.vs/
+**/bin/
+**/obj/
+**/TestResults/
+**/*.db
+**/*.db-shm
+**/*.db-wal
+.env
+.env.*
+**/.env
+**/.env.*
+**/secrets.json
+**/*.pfx
+**/*.pem
+**/*.key

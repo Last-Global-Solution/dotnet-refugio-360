@@ -16,19 +16,7 @@ using Refugio360.Api;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var jwtSecret = builder.Configuration["Jwt:Secret"] ?? Environment.GetEnvironmentVariable("REFUGIO_JWT_SECRET");
-if (string.IsNullOrWhiteSpace(jwtSecret) && builder.Environment.IsDevelopment())
-{
-    jwtSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-    Console.WriteLine("JWT development key generated for this run. Configure User Secrets for stable tokens.");
-}
-if (string.IsNullOrWhiteSpace(jwtSecret) || Encoding.UTF8.GetByteCount(jwtSecret) < 32)
-    throw new InvalidOperationException("Configure Jwt:Secret (at least 32 UTF-8 bytes) using user secrets or REFUGIO_JWT_SECRET.");
-
-var issuer = builder.Configuration["Jwt:Issuer"] ?? "Refugio360";
-var audience = builder.Configuration["Jwt:Audience"] ?? "Refugio360.Mobile";
-var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
-
+builder.Services.AddSingleton(sp => JwtSettings.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddDbContext<RefugioDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Refugio") ?? "Data Source=refugio360.db"));
 builder.Services.AddProblemDetails();
@@ -44,13 +32,14 @@ builder.Services.AddSwaggerGen(options =>
         In = ParameterLocation.Header, Description = "Informe o token JWT retornado por POST /api/v1/auth/token."
     });
 });
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme).Configure<JwtSettings>((options, jwt) =>
 {
     options.TokenValidationParameters = new TokenValidationParameters
     {
-        ValidateIssuer = true, ValidIssuer = issuer,
-        ValidateAudience = true, ValidAudience = audience,
-        ValidateIssuerSigningKey = true, IssuerSigningKey = signingKey,
+        ValidateIssuer = true, ValidIssuer = jwt.Issuer,
+        ValidateAudience = true, ValidAudience = jwt.Audience,
+        ValidateIssuerSigningKey = true, IssuerSigningKey = jwt.SigningKey,
         ValidateLifetime = true, ClockSkew = TimeSpan.FromSeconds(30)
     };
 });
@@ -72,6 +61,8 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+// WebApplicationFactory fornece a configuração de teste durante Build(); valide o segredo antes de servir requisições.
+_ = app.Services.GetRequiredService<JwtSettings>();
 app.UseExceptionHandler();
 app.UseRouting();
 app.UseAuthentication();
@@ -85,7 +76,7 @@ await using (var scope = app.Services.CreateAsyncScope())
     var db = scope.ServiceProvider.GetRequiredService<RefugioDbContext>();
     await db.Database.EnsureCreatedAsync();
     await SqliteSchemaUpdater.UpgradeAsync(db);
-    if (app.Environment.IsDevelopment())
+    if (app.Configuration.GetValue<bool>("DemoData:Enabled"))
     {
         var demoUsername = app.Configuration["DemoUser:Username"] ?? Environment.GetEnvironmentVariable("REFUGIO_DEMO_USER");
         await DemoDataSeeder.SeedAsync(db, demoUsername);
@@ -109,7 +100,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 
 var api = app.MapGroup("/api/v1").RequireRateLimiting("api");
 
-api.MapPost("/auth/token", (TokenRequest request, IConfiguration config) =>
+api.MapPost("/auth/token", (TokenRequest request, IConfiguration config, JwtSettings jwt) =>
 {
     var expectedUser = config["DemoUser:Username"] ?? Environment.GetEnvironmentVariable("REFUGIO_DEMO_USER");
     var expectedPassword = config["DemoUser:Password"] ?? Environment.GetEnvironmentVariable("REFUGIO_DEMO_PASSWORD");
@@ -127,8 +118,8 @@ api.MapPost("/auth/token", (TokenRequest request, IConfiguration config) =>
         new Claim(ClaimTypes.Name, expectedUser),
         new Claim(ClaimTypes.Role, role)
     };
-    var token = new JwtSecurityToken(config["Jwt:Issuer"] ?? "Refugio360", config["Jwt:Audience"] ?? "Refugio360.Mobile",
-        claims, now, now.AddHours(2), new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256));
+    var token = new JwtSecurityToken(jwt.Issuer, jwt.Audience,
+        claims, now, now.AddHours(2), new SigningCredentials(jwt.SigningKey, SecurityAlgorithms.HmacSha256));
     return Results.Ok(new TokenResponse(new JwtSecurityTokenHandler().WriteToken(token), "Bearer", 7200));
 }).AllowAnonymous().WithName("CreateToken").WithSummary("Emite um token JWT de demonstração.")
   .Produces<TokenResponse>(StatusCodes.Status200OK).Produces(StatusCodes.Status401Unauthorized).ProducesProblem(StatusCodes.Status503ServiceUnavailable);

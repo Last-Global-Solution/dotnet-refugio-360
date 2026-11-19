@@ -108,6 +108,8 @@ public sealed class RefugioApiFactory : WebApplicationFactory<global::Program>
     public string Username { get; } = "teste";
     public string Password { get; } = Convert.ToBase64String(RandomNumberGenerator.GetBytes(24));
     public string Role { get; set; } = "Morador";
+    public string EnvironmentName { get; set; } = "Testing";
+    public bool EnableDemoData { get; set; }
     private string JwtSecret { get; } = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
     public RefugioApiFactory()
@@ -127,7 +129,7 @@ public sealed class RefugioApiFactory : WebApplicationFactory<global::Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Testing");
+        builder.UseEnvironment(EnvironmentName);
         builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Jwt:Secret"] = JwtSecret,
@@ -135,6 +137,7 @@ public sealed class RefugioApiFactory : WebApplicationFactory<global::Program>
             ["DemoUser:Password"] = Password,
             ["DemoUser:Role"] = Role,
             ["ConnectionStrings:Refugio"] = _connectionString,
+            ["DemoData:Enabled"] = EnableDemoData.ToString(),
             ["RateLimit:PermitLimit"] = "1000"
         }));
     }
