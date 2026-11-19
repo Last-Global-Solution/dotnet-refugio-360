@@ -2,6 +2,8 @@
 
 **Repositório:** [Last-Global-Solution/dotnet-refugio-360](https://github.com/Last-Global-Solution/dotnet-refugio-360)
 
+**API já publicada no Render:** https://dotnet-refugio-360.onrender.com
+
 API REST de demonstração com relatos comunitários, triagem por moderador, locais de apoio e alertas publicados após revisão. O escopo usa dados fictícios e não substitui orientação oficial de emergência.
 
 ## Estrutura
@@ -80,7 +82,7 @@ O SQLite cria `refugio360.db` no diretório de execução (normalmente `Refugio3
 
 Ao iniciar uma cópia nova do código com um `refugio360.db` de versão anterior, a API acrescenta a coluna de verificação de disponibilidade sem apagar os dados. Alertas antigos com status `Revisado` passam a `Publicado` para manter a visibilidade que já tinham. Isso é uma atualização pontual de esquema para SQLite, não um sistema geral de migrations. Os testes usam SQLite em memória e não alteram seu arquivo local. Em Testing ou Production, a carga fictícia só ocorre quando `DemoData__Enabled=true` for definido explicitamente.
 
-Se você extrair o ZIP em outra pasta e quiser manter seus registros, pare a API e copie o arquivo `refugio360.db` antigo para a nova pasta `Refugio360.Api` antes de executar `dotnet run`. Se não copiar, a API cria um banco novo com os dados fictícios de demonstração.
+Se você extrair o ZIP em outra pasta e quiser manter seus registros, pare a API e copie o arquivo `refugio360.db` antigo para a nova pasta `Refugio360.Api` antes de executar `dotnet run`. Se não copiar, a API cria um banco novo **vazio**; os dados fictícios só são inseridos quando `DemoData__Enabled=true`.
 
 ## Papéis e acesso
 
@@ -205,10 +207,20 @@ Com o contêiner no ar, verifique `http://localhost:10000/health/live`, `http://
 
 ### Criar o Web Service no Render
 
+O serviço já está hospedado em https://dotnet-refugio-360.onrender.com. As instruções abaixo permitem reproduzir a hospedagem ou conferir sua configuração em um novo deploy.
+
 1. Selecione este repositório Git; crie **um** Web Service com runtime **Docker**. Use **Root Directory vazio (raiz do repositório)**, **Dockerfile Path `Dockerfile`** e contexto de build na raiz. Mantenha a branch desejada; não use `Refugio360.Api` como Root Directory com este Dockerfile.
 2. Configure Environment: `ASPNETCORE_ENVIRONMENT=Production`, `DemoData__Enabled=true` e `REFUGIO_JWT_SECRET` com uma chave aleatória estável de no mínimo 32 bytes (por exemplo, gere localmente com `openssl rand -hex 32` e armazene **somente** no painel Render). Como alternativa, configure `Jwt__Secret`, **não ambos com valores diferentes**. Não configure `Jwt:Secret` com valor fixo no repositório.
 3. `PORT` é fornecida pelo Render; caso precise definir manualmente, use `10000`. `ConnectionStrings__Refugio` é opcional; por padrão a imagem cria `/app/refugio360.db`. Configure `REFUGIO_DEMO_USER` e `REFUGIO_DEMO_PASSWORD` **somente** se precisar emitir tokens pelo `/api/v1/auth/token`; `REFUGIO_DEMO_ROLE` pode ser `Morador` (padrão) ou `Moderador`. Não há credencial administrativa padrão. `Jwt__Issuer` e `Jwt__Audience` são opcionais; padrões: `Refugio360` e `Refugio360.Mobile`.
 4. Configure o **Health Check Path `/health/ready`**, que confere o SQLite. `/health/live` confirma apenas que a aplicação responde. Nos logs de inicialização, confira binding em `0.0.0.0` na porta fornecida, criação/acesso ao banco e ausência de erros de JWT. O seed não precisa do ambiente `Development`.
 5. Depois do deploy, use a URL HTTPS **atribuída pelo Render** (não presuma um hostname). Faça `GET /health/live`, `/health/ready`, `/api/v1/alertas`; consulte também `GET /api/v1/alertas/{id}` com o ID obtido da listagem. A lista deve conter o alerta acadêmico DEMO sem token. Configure no Mobile `EXPO_PUBLIC_DOTNET_API_URL` com a **base HTTPS real**, sem acrescentar `/api/v1`.
+
+No serviço atual, as consultas públicas de verificação são:
+
+```http
+GET https://dotnet-refugio-360.onrender.com/health/live
+GET https://dotnet-refugio-360.onrender.com/health/ready
+GET https://dotnet-refugio-360.onrender.com/api/v1/alertas
+```
 
 No plano gratuito o filesystem do Render é **efêmero**: o SQLite pode perder alertas reais, ocorrências e alterações durante reinício/redeploy. O seed repõe apenas dados fictícios ausentes e preserva registros encontrados pelo ID estável; não restaura dados reais. Mesmo com `DemoData__Enabled=true`, nenhum alerta fora do seed é publicado automaticamente: as rotas de moderação continuam exigindo revisão. O seed também só cria a ocorrência fictícia se `DemoUser:Username`/`REFUGIO_DEMO_USER` estiver configurado.
